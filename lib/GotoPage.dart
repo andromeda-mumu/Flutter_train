@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 /**
  * 页面跳转
+ * 并且通过页面跳转传递数据
  */
 
 void main(){
@@ -27,6 +28,7 @@ class _FirstScreenState extends State<FirstScreen>{
                child: Text('First Screen'),
                onPressed: ()async{
                  var msg = await Navigator.push(context, MaterialPageRoute(builder: (_)=>SecondScreen()));
+                 debugPrint('mmc=  msg=$msg');
 //                   Navigator.push(context, MaterialPageRoute(builder: (_)=>SecondScreen()));
                 }),
          ),
