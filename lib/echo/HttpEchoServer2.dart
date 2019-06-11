@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:convert';
 import '../Message.dart';
 import 'package:path_provider/path_provider.dart' as path_provider;
+import 'package:sqflite/sqflite.dart';
 /**
  * Created by wangjiao on 2019/6/11.
  * description: 服务端架构
@@ -17,6 +18,13 @@ class HttpEchoServer2{
   HttpServer httpServer;
 //  Map<String,void Function(HttpServer)> routes;
   Map<String, void Function(HttpRequest)> routes;
+
+  static const tableName ='history';
+  static const columnId ='id';
+  static const columnMsg='msg';
+  static const columnTimestamp ='timestamp';
+  Database database;
+
 
   HttpEchoServer2(this.port){
     _initRoutes();
@@ -33,6 +41,7 @@ class HttpEchoServer2{
   }
 
   Future start() async{
+    await _initDatabase();
     historyFilepath = await _historyPath();
     //在启动服务器前先加载历史记录
     await _loadMessages();
@@ -50,20 +59,48 @@ class HttpEchoServer2{
       }
     });
   }
+  Future _initDatabase() async{
+    var path = await getDatabasesPath()+"/history.db";
+    database = await openDatabase(
+      path,
+      version: 1,
+      onCreate: (db,version)async{
+          var sql='''
+         CREATE TABLE $tableName (            
+         $columnId INTEGER PRIMARY KEY,            
+         $columnMsg TEXT,            
+         $columnTimestamp INTEGER            
+         )
+          ''';
+          await db.execute(sql);
+     }
+    );
+  }
   Future _loadMessages()async{
-    try {
-      var file = File(historyFilepath);
-      var exits = await file.exists();
-      if(!exits) return;
+//    try {
+//      var file = File(historyFilepath);
+//      var exits = await file.exists();
+//      if(!exits) return;
+//
+//      var content = await file.readAsString();
+//      var list = json.decode(content);
+//      for(var msg in list){
+//        var message = Message.fromJson(msg);
+//        messages.add(message);
+//      }
+//    }catch(e){
+//      print("mmc= _loadMessages:$e");
+//    }
 
-      var content = await file.readAsString();
-      var list = json.decode(content);
-      for(var msg in list){
-        var message = Message.fromJson(msg);
-        messages.add(message);
-      }
-    }catch(e){
-      print("mmc= _loadMessages:$e");
+  //使用数据库的方式获取
+    var list = await database.query(
+      tableName,
+      columns: [columnMsg,columnTimestamp],
+      orderBy: columnId,
+    );
+    for(var item in list){
+      var message = Message.fromJson(item);
+      messages.add(message);
     }
   }
   Future<String> _historyPath() async{
@@ -101,36 +138,43 @@ class HttpEchoServer2{
       //  所以 encode 方法会调用对象的 toJson 方法，这个方法在前面我们已经定义了
       var data = json.encode(messages);
       request.response.write(data);
-      _storeMessages();
+      _storeMessages(message);
     }else{
       request.response.statusCode = HttpStatus.badRequest;
     }
     request.response.close();
 
+
   }
-  Future<bool> _storeMessages() async{
-    try{
-      //json.decode支持list map
-      final data =json.encode(messages);
-      final file = File(historyFilepath);
-      final exits = await file.exists();
-      if(!exits){
-        await file.create();
-      }
-      file.writeAsString(data);
-      return true;
-      // 虽然文件操作方法都是异步的，我们仍然可以通过这种方式 catch 到
-      // 他们抛出的异常
-    }catch(e){
-      print("mmc= _storeMessages:$e");
-      return false;
-    }
+  Future<bool> _storeMessages(Message msg) async{
+//    try{
+//      //json.decode支持list map
+//      final data =json.encode(messages);
+//      final file = File(historyFilepath);
+//      final exits = await file.exists();
+//      if(!exits){
+//        await file.create();
+//      }
+//      file.writeAsString(data);
+//      return true;
+//      // 虽然文件操作方法都是异步的，我们仍然可以通过这种方式 catch 到
+//      // 他们抛出的异常
+//    }catch(e){
+//      print("mmc= _storeMessages:$e");
+//      return false;
+//    }
+
+  database.insert(tableName, msg.toJson());
   }
 
   void close()async{
     var server = httpServer;
     httpServer = null;
     await server?.close();
+
+    var db = database;
+    database=null;
+    db?.close();
   }
 
 }
